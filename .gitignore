@@ -1,0 +1,11 @@
+# Maven / Java
+target/
+.idea/
+*.iml
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node / React (frontend build output gets copied into target/, not committed there either)
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
