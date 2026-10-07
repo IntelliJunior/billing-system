@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getInvoice, recordPayment, cancelInvoice } from '../api/api';
+import { getInvoice, recordPayment, cancelInvoice, downloadInvoicePdf } from '../api/api';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -36,6 +36,29 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handlePdf = async (openInTab) => {
+    // Open the tab immediately so the browser doesn't block it as a popup
+    const tab = openInTab ? window.open('', '_blank') : null;
+    try {
+      const res = await downloadInvoicePdf(id);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${invoice.invoiceNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      if (tab) tab.close();
+      alert('Could not generate the PDF');
+    }
+  };
+
   if (!invoice) return <p className="empty">Loading…</p>;
 
   const balanceDue = Number(invoice.totalAmount) - Number(invoice.amountPaid);
@@ -49,7 +72,11 @@ export default function InvoiceDetailPage() {
             {invoice.customer?.name} · Issued {invoice.issueDate}{invoice.dueDate ? ` · Due ${invoice.dueDate}` : ''}
           </p>
         </div>
-        <span className={`badge ${invoice.status}`}>{invoice.status.replace('_', ' ')}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn secondary small" onClick={() => handlePdf(true)}>🖨 Print</button>
+          <button className="btn secondary small" onClick={() => handlePdf(false)}>⬇ Download PDF</button>
+          <span className={`badge ${invoice.status}`}>{invoice.status.replace('_', ' ')}</span>
+        </div>
       </div>
 
       <div className="card">
