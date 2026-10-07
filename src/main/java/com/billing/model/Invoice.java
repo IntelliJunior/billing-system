@@ -1,5 +1,6 @@
 package com.billing.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "invoices")
+@Table(name = "invoices", indexes = @Index(name = "idx_invoices_tenant", columnList = "tenant_id"))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,6 +27,7 @@ public class Invoice {
     @Column(unique = true, nullable = false)
     private String invoiceNumber;
 
+    // EAGER so the customer is always included in the JSON (a lazy proxy cannot be serialized)
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
@@ -60,6 +62,11 @@ public class Invoice {
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    // Owner of this record. Never sent to or accepted from the browser.
+    @Column(name = "tenant_id")
+    @JsonIgnore
+    private Long tenantId;
 
     @PrePersist
     protected void onCreate() {

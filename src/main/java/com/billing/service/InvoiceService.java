@@ -7,6 +7,7 @@ import com.billing.exception.ResourceNotFoundException;
 import com.billing.model.*;
 import com.billing.repository.InvoiceRepository;
 import com.billing.repository.ProductRepository;
+import com.billing.security.CurrentTenant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,28 +26,32 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final ProductRepository productRepository;
     private final CustomerService customerService;
+    private final CurrentTenant currentTenant;
 
     public List<Invoice> getAll() {
-        return invoiceRepository.findAll();
+        return invoiceRepository.findByTenantId(currentTenant.id());
     }
 
     public List<Invoice> getByCustomer(Long customerId) {
-        return invoiceRepository.findByCustomerId(customerId);
+        return invoiceRepository.findByTenantIdAndCustomerId(currentTenant.id(), customerId);
     }
 
     public List<Invoice> getByStatus(InvoiceStatus status) {
-        return invoiceRepository.findByStatus(status);
+        return invoiceRepository.findByTenantIdAndStatus(currentTenant.id(), status);
     }
 
     public Invoice getById(Long id) {
-        return invoiceRepository.findById(id)
+        return invoiceRepository.findByIdAndTenantId(id, currentTenant.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with id: " + id));
     }
 
     public Invoice create(InvoiceRequest req) {
+        Long tenantId = currentTenant.id();
+        // Throws "not found" if the customer belongs to another tenant
         Customer customer = customerService.getById(req.getCustomerId());
 
         Invoice invoice = new Invoice();
+        invoice.setTenantId(tenantId);
         invoice.setCustomer(customer);
         invoice.setInvoiceNumber(generateInvoiceNumber());
         invoice.setIssueDate(req.getIssueDate() != null ? req.getIssueDate() : java.time.LocalDate.now());
@@ -64,7 +69,8 @@ public class InvoiceService {
             Double taxPercent = itemReq.getTaxPercent() != null ? itemReq.getTaxPercent() : 0.0;
 
             if (itemReq.getProductId() != null) {
-                Product product = productRepository.findById(itemReq.getProductId())
+                // Only products of this tenant can be used
+                Product product = productRepository.findByIdAndTenantId(itemReq.getProductId(), tenantId)
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Product not found with id: " + itemReq.getProductId()));
                 item.setProduct(product);

@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "customers")
+@Table(name = "customers", indexes = @Index(name = "idx_customers_tenant", columnList = "tenant_id"))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,8 +27,8 @@ public class Customer {
     @Column(nullable = false)
     private String name;
 
+    // Unique per tenant (checked in CustomerService), not globally
     @Email(message = "Email should be valid")
-    @Column(unique = true)
     private String email;
 
     private String phone;
@@ -37,6 +37,11 @@ public class Customer {
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    // Owner of this record. Never sent to or accepted from the browser.
+    @Column(name = "tenant_id")
+    @JsonIgnore
+    private Long tenantId;
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
