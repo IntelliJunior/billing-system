@@ -1,6 +1,10 @@
 package com.billing.dto;
 
+import com.billing.model.FilingFrequency;
+import com.billing.model.ModuleType;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record TenantResponse(
         Long id,
@@ -19,5 +23,10 @@ public record TenantResponse(
         String upiId,
         String username,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt) {
+        LocalDateTime updatedAt,
+        List<ModuleType> modules,
+        String gstin,
+        String stateCode,
+        FilingFrequency filingFrequency,
+        String invoicePrefix) {
 }

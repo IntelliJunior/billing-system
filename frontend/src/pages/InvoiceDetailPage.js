@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getInvoice, recordPayment, cancelInvoice, downloadInvoicePdf } from '../api/api';
+import { getInvoice, recordPayment, cancelInvoice, downloadInvoicePdf, getGstStates } from '../api/api';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -9,10 +9,19 @@ export default function InvoiceDetailPage() {
   const [method, setMethod] = useState('CASH');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [states, setStates] = useState([]);
 
-  const load = () => getInvoice(id).then((res) => setInvoice(res.data));
+  const load = () =>
+    getInvoice(id)
+      .then((res) => setInvoice(res.data))
+      .catch((err) => setLoadError(err.response?.data?.message || 'Could not load invoice (check the backend console)'));
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    getGstStates().then((res) => setStates(res.data)).catch(() => {});
+  }, []);
 
   const submitPayment = async (e) => {
     e.preventDefault();
@@ -37,7 +46,7 @@ export default function InvoiceDetailPage() {
   };
 
   const handlePdf = async (openInTab) => {
-    // Open the tab immediately so the browser doesn't block it as a popup
+    // Open the tab immediately so the browser does not block it as a popup
     const tab = openInTab ? window.open('', '_blank') : null;
     try {
       const res = await downloadInvoicePdf(id);
@@ -59,9 +68,15 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  if (loadError) return <p className="empty">{loadError}</p>;
   if (!invoice) return <p className="empty">Loading…</p>;
 
   const balanceDue = Number(invoice.totalAmount) - Number(invoice.amountPaid);
+  const gst = !!invoice.gstInvoice;
+  const stateName = (code) => {
+    const found = states.find((st) => st.code === code);
+    return found ? `${found.name} (${code})` : code || '—';
+  };
 
   return (
     <div>
@@ -79,14 +94,26 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
+      {gst && (
+        <div className="card">
+          <strong>Tax invoice</strong>
+          <p className="subtitle" style={{ marginBottom: 0 }}>
+            Your GSTIN: {invoice.supplierGstin} · Customer GSTIN: {invoice.customerGstin || 'Unregistered'} ·
+            Place of supply: {stateName(invoice.placeOfSupplyStateCode)} ·
+            {invoice.interState ? ' Inter-state (IGST)' : ' Intra-state (CGST + SGST)'}
+          </p>
+        </div>
+      )}
+
       <div className="card">
         <strong>Line Items</strong>
         <table style={{ marginTop: 12 }}>
-          <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Tax %</th><th>Line Total</th></tr></thead>
+          <thead><tr><th>Description</th>{gst && <th>HSN/SAC</th>}<th>Qty</th><th>Unit Price</th><th>{gst ? 'GST %' : 'Tax %'}</th><th>Line Total</th></tr></thead>
           <tbody>
             {invoice.items.map((it) => (
               <tr key={it.id}>
                 <td>{it.description}</td>
+                {gst && <td>{it.hsnCode || '—'}</td>}
                 <td>{it.quantity}</td>
                 <td>₹{Number(it.unitPrice).toFixed(2)}</td>
                 <td>{it.taxPercent}%</td>
@@ -100,7 +127,18 @@ export default function InvoiceDetailPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card">
           <div className="summary-line"><span>Subtotal</span><span>₹{Number(invoice.subtotal).toFixed(2)}</span></div>
-          <div className="summary-line"><span>Tax</span><span>₹{Number(invoice.taxAmount).toFixed(2)}</span></div>
+          {gst ? (
+            invoice.interState ? (
+              <div className="summary-line"><span>IGST</span><span>₹{Number(invoice.igstAmount).toFixed(2)}</span></div>
+            ) : (
+              <>
+                <div className="summary-line"><span>CGST</span><span>₹{Number(invoice.cgstAmount).toFixed(2)}</span></div>
+                <div className="summary-line"><span>SGST</span><span>₹{Number(invoice.sgstAmount).toFixed(2)}</span></div>
+              </>
+            )
+          ) : (
+            <div className="summary-line"><span>Tax</span><span>₹{Number(invoice.taxAmount).toFixed(2)}</span></div>
+          )}
           <div className="summary-line"><span>Total</span><span>₹{Number(invoice.totalAmount).toFixed(2)}</span></div>
           <div className="summary-line"><span>Paid</span><span>₹{Number(invoice.amountPaid).toFixed(2)}</span></div>
           <div className="summary-line total"><span>Balance Due</span><span>₹{balanceDue.toFixed(2)}</span></div>

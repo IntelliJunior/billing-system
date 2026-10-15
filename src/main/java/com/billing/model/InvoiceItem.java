@@ -44,4 +44,20 @@ public class InvoiceItem {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
+
+    // ---- GST snapshot (null on lines created before GST) ----
+    @Column(length = 8)
+    private String hsnCode;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal taxableValue;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal cgstAmount;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal sgstAmount;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal igstAmount;
 }

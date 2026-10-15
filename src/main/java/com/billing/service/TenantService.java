@@ -5,7 +5,11 @@ import com.billing.dto.TenantForm;
 import com.billing.dto.TenantResponse;
 import com.billing.exception.BadRequestException;
 import com.billing.exception.ResourceNotFoundException;
+import com.billing.gst.GstStates;
+import com.billing.gst.GstinValidator;
 import com.billing.model.AppUser;
+import com.billing.model.FilingFrequency;
+import com.billing.model.ModuleType;
 import com.billing.model.Role;
 import com.billing.model.Tenant;
 import com.billing.repository.AppUserRepository;
@@ -147,6 +151,14 @@ public class TenantService {
         t.setBranch(clean(f.getBranch()));
         t.setUpiId(clean(f.getUpiId()));
 
+        if (f.getModules() == null || f.getModules().isEmpty()) {
+            throw new BadRequestException("Select at least one feature (Invoicing or Inventory)");
+        }
+        t.getModules().clear();
+        t.getModules().addAll(f.getModules());
+
+        applyGstProfile(t, f);
+
         if (f.isRemoveBanner()) {
             t.setBanner(null);
             t.setBannerContentType(null);
@@ -155,6 +167,40 @@ public class TenantService {
         if (file != null && !file.isEmpty()) {
             setBanner(t, file);
         }
+    }
+
+    /** The GST profile is only touched (and checked) while the GST feature is selected. */
+    private void applyGstProfile(Tenant t, TenantForm f) {
+        if (!f.getModules().contains(ModuleType.GST)) {
+            return;
+        }
+        if (!f.getModules().contains(ModuleType.INVOICING)) {
+            throw new BadRequestException("GST needs the Invoicing feature. Please select both.");
+        }
+        String gstin = GstinValidator.normalize(clean(f.getGstin()));
+        if (gstin == null || !GstinValidator.isValid(gstin)) {
+            throw new BadRequestException("Enter a valid GSTIN for the tenant");
+        }
+        String gstinState = GstinValidator.stateCodeOf(gstin);
+        String state = clean(f.getStateCode());
+        if (state != null && !state.equals(gstinState)) {
+            throw new BadRequestException("The state does not match the GSTIN, which starts with state code "
+                    + gstinState + " (" + GstStates.label(gstinState) + ")");
+        }
+        String prefix = clean(f.getInvoicePrefix()) == null ? null : clean(f.getInvoicePrefix()).toUpperCase();
+        if (prefix == null || !prefix.matches("[A-Z0-9]{2,4}")) {
+            throw new BadRequestException("Invoice prefix must be 2 to 4 letters or digits, for example IJ");
+        }
+        boolean taken = t.getId() == null
+                ? tenantRepository.existsByInvoicePrefixIgnoreCase(prefix)
+                : tenantRepository.existsByInvoicePrefixIgnoreCaseAndIdNot(prefix, t.getId());
+        if (taken) {
+            throw new BadRequestException("Another tenant already uses the invoice prefix " + prefix);
+        }
+        t.setGstin(gstin);
+        t.setStateCode(gstinState);
+        t.setInvoicePrefix(prefix);
+        t.setFilingFrequency(f.getFilingFrequency() == null ? FilingFrequency.MONTHLY : f.getFilingFrequency());
     }
 
     private void setBanner(Tenant t, MultipartFile file) {
@@ -196,6 +242,8 @@ public class TenantService {
                 t.getId(), t.getName(), t.getContactName(), t.getMobile(), t.getEmail(), t.getAddress(),
                 t.isEnabled(), t.getBanner() != null,
                 t.getAccountHolder(), t.getBankName(), t.getAccountNumber(), t.getIfsc(), t.getBranch(), t.getUpiId(),
-                username, t.getCreatedAt(), t.getUpdatedAt());
+                username, t.getCreatedAt(), t.getUpdatedAt(),
+                t.getModules().stream().sorted().toList(),
+                t.getGstin(), t.getStateCode(), t.getFilingFrequency(), t.getInvoicePrefix());
     }
 }

@@ -4,6 +4,7 @@ import com.billing.model.Invoice;
 import com.billing.model.InvoiceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByTenantIdAndStatus(Long tenantId, InvoiceStatus status);
 
     Optional<Invoice> findByIdAndTenantId(Long id, Long tenantId);
+
+    /** Invoices dated from..to, both days included (used by the GST reports). */
+    List<Invoice> findByTenantIdAndIssueDateBetweenOrderByIssueDateAscIdAsc(Long tenantId, LocalDate from, LocalDate to);
 
     // Invoice numbers stay unique across the whole system
     boolean existsByInvoiceNumber(String invoiceNumber);

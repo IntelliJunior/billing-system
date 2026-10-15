@@ -16,6 +16,9 @@ public class InvoiceRequest {
     private LocalDate issueDate;
     private LocalDate dueDate;
 
+    // GST tenants only: state the goods or services go to. Defaults to the customer's state.
+    private String placeOfSupplyStateCode;
+
     @NotEmpty(message = "Invoice must have at least one item")
     @Valid
     private List<InvoiceItemRequest> items;

@@ -37,6 +37,28 @@ public class Product {
     @Column(nullable = false)
     private Double taxPercent = 0.0;
 
+    // HSN (goods) or SAC (services) code, used by tenants with the GST feature
+    @Column(length = 8)
+    private String hsnCode;
+
+    // ---- Inventory fields (used only by tenants with the Inventory feature) ----
+    // Wrapper types and no NOT NULL so existing rows keep working.
+    private String sku;
+
+    private String unit;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal costPrice;
+
+    private Boolean trackStock;
+
+    @Column(precision = 12, scale = 3)
+    private BigDecimal reorderLevel;
+
+    // Changed only through stock movements, never directly
+    @Column(precision = 12, scale = 3)
+    private BigDecimal quantityOnHand;
+
     // Owner of this record. Never sent to or accepted from the browser.
     @Column(name = "tenant_id")
     @JsonIgnore

@@ -24,6 +24,10 @@ public class InvoiceItemRequest {
     @PositiveOrZero
     private BigDecimal unitPrice;
 
+    // The GST rate for tenants with the GST feature
     @PositiveOrZero
     private Double taxPercent = 0.0;
+
+    // HSN / SAC code (GST tenants). Falls back to the product's code.
+    private String hsnCode;
 }

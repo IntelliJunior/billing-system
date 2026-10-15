@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../api/api';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getGstStates } from '../api/api';
+import { useAuth } from '../auth/AuthContext';
 
-const emptyForm = { name: '', email: '', phone: '', address: '' };
+const emptyForm = { name: '', email: '', phone: '', address: '', gstin: '', stateCode: '' };
 
 export default function CustomersPage() {
+  const { user } = useAuth();
+  const hasGst = (user.modules || []).includes('GST');
+  const [states, setStates] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -12,10 +16,22 @@ export default function CustomersPage() {
 
   const load = () => getCustomers().then((res) => setCustomers(res.data));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    if (hasGst) getGstStates().then((res) => setStates(res.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openNew = () => { setForm(emptyForm); setEditingId(null); setShowForm(true); setError(''); };
-  const openEdit = (c) => { setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '' }); setEditingId(c.id); setShowForm(true); setError(''); };
+  const openEdit = (c) => { setForm({ name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '', gstin: c.gstin || '', stateCode: c.stateCode || '' }); setEditingId(c.id); setShowForm(true); setError(''); };
+
+  // Typing the GSTIN fills in the state, because the first two digits are the state code
+  const onGstinChange = (e) => {
+    const value = e.target.value.toUpperCase().replace(/\s/g, '');
+    const code = value.slice(0, 2);
+    const known = states.some((s) => s.code === code);
+    setForm({ ...form, gstin: value, stateCode: known ? code : form.stateCode });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -69,6 +85,21 @@ export default function CustomersPage() {
                 <label>Address</label>
                 <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </div>
+              {hasGst && (
+                <>
+                  <div className="form-row">
+                    <label>GSTIN (leave empty for customers without GST)</label>
+                    <input value={form.gstin} onChange={onGstinChange} maxLength={15} />
+                  </div>
+                  <div className="form-row">
+                    <label>State (decides CGST + SGST or IGST)</label>
+                    <select value={form.stateCode} onChange={(e) => setForm({ ...form, stateCode: e.target.value })}>
+                      <option value="">Same as my state</option>
+                      {states.map((s) => <option key={s.code} value={s.code}>{s.name} ({s.code})</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             {error && <p className="error-text">{error}</p>}
             <button type="submit" className="btn">{editingId ? 'Update' : 'Create'}</button>{' '}
@@ -82,7 +113,7 @@ export default function CustomersPage() {
           <p className="empty">No customers yet.</p>
         ) : (
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th>{hasGst && <th>GSTIN</th>}<th></th></tr></thead>
             <tbody>
               {customers.map((c) => (
                 <tr key={c.id}>
@@ -90,6 +121,7 @@ export default function CustomersPage() {
                   <td>{c.email || '—'}</td>
                   <td>{c.phone || '—'}</td>
                   <td>{c.address || '—'}</td>
+                  {hasGst && <td>{c.gstin || 'Unregistered'}</td>}
                   <td>
                     <button className="btn secondary small" onClick={() => openEdit(c)}>Edit</button>{' '}
                     <button className="btn danger small" onClick={() => remove(c.id)}>Delete</button>

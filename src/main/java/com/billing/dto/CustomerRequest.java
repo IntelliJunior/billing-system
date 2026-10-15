@@ -14,4 +14,8 @@ public class CustomerRequest {
 
     private String phone;
     private String address;
+
+    // Used only when the tenant has the GST feature
+    private String gstin;
+    private String stateCode;
 }

@@ -35,6 +35,13 @@ public class Customer {
 
     private String address;
 
+    // GST details (used when the tenant has the GST feature)
+    @Column(length = 15)
+    private String gstin;
+
+    @Column(length = 2)
+    private String stateCode;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

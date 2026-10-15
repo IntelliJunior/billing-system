@@ -1,5 +1,6 @@
 package com.billing.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.Map;
  * Turns exceptions into JSON like {"status":400,"message":"..."} so the React app can show them.
  * If you already have a handler with the same purpose, you can delete this file.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -48,8 +50,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException ex) {
-        return build(HttpStatus.CONFLICT,
-                "Could not save: a record with the same unique value (such as email or name) already exists", null);
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        log.error("Database rejected a save: {}", detail);
+
+        String lower = detail == null ? "" : detail.toLowerCase();
+        boolean duplicate = lower.contains("unique") || lower.contains("duplicate");
+        String message = duplicate
+                ? "Could not save: a record with the same unique value (such as email, name or invoice prefix) already exists"
+                : "Could not save: the database rejected this data. Please tell your administrator. ("
+                + (detail == null ? "no details" : detail.split("\\R")[0]) + ")";
+        return build(HttpStatus.CONFLICT, message, null);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, Map<String, String> fields) {

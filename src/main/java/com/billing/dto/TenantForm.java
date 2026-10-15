@@ -1,11 +1,15 @@
 package com.billing.dto;
 
 import jakarta.validation.constraints.Email;
+import com.billing.model.FilingFrequency;
+import com.billing.model.ModuleType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Data
 public class TenantForm {
@@ -34,6 +38,15 @@ public class TenantForm {
     private String ifsc;
     private String branch;
     private String upiId;
+
+    // Features switched on for this tenant (at least one is required)
+    private List<ModuleType> modules;
+
+    // GST profile (required when the GST feature is selected)
+    private String gstin;
+    private String stateCode;
+    private FilingFrequency filingFrequency;
+    private String invoicePrefix;
 
     // Login username: required when creating, ignored when editing
     @Pattern(regexp = "^$|^[A-Za-z0-9._-]{4,30}$",

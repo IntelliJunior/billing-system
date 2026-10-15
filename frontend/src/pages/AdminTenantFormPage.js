@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getTenant, createTenant, updateTenant } from '../api/api';
+import { getTenant, createTenant, updateTenant, getGstStates } from '../api/api';
 
 const EMPTY = {
   name: '', contactName: '', mobile: '', email: '', address: '', username: '',
   accountHolder: '', bankName: '', accountNumber: '', ifsc: '', branch: '', upiId: '',
+  gstin: '', stateCode: '', filingFrequency: 'MONTHLY', invoicePrefix: '',
 };
 
 const grid = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
+
+const FEATURES = [
+  { key: 'INVOICING', label: 'Invoicing', help: 'Customers, products, invoices, payments and PDF invoices' },
+  { key: 'INVENTORY', label: 'Inventory', help: 'Stock tracking, stock in/out, stock history, suppliers and low-stock list' },
+  { key: 'GST', label: 'GST', help: 'GST tax invoices (CGST/SGST/IGST, HSN) and GST reports. Needs Invoicing.' },
+];
 
 export default function AdminTenantFormPage() {
   const { id } = useParams();
@@ -19,6 +26,8 @@ export default function AdminTenantFormPage() {
   const [bannerPreview, setBannerPreview] = useState('');
   const [hasBanner, setHasBanner] = useState(false);
   const [removeBanner, setRemoveBanner] = useState(false);
+  const [modules, setModules] = useState(['INVOICING']);
+  const [states, setStates] = useState([]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -34,14 +43,32 @@ export default function AdminTenantFormPage() {
           accountHolder: t.accountHolder || '', bankName: t.bankName || '',
           accountNumber: t.accountNumber || '', ifsc: t.ifsc || '', branch: t.branch || '',
           upiId: t.upiId || '',
+          gstin: t.gstin || '', stateCode: t.stateCode || '',
+          filingFrequency: t.filingFrequency || 'MONTHLY', invoicePrefix: t.invoicePrefix || '',
         });
         setHasBanner(t.hasBanner);
+        setModules(t.modules && t.modules.length ? t.modules : ['INVOICING']);
       })
       .catch(() => setError('Could not load the tenant'))
       .finally(() => setLoading(false));
   }, [id, isEdit]);
 
+  useEffect(() => {
+    getGstStates().then((res) => setStates(res.data)).catch(() => {});
+  }, []);
+
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+
+  // Typing the GSTIN fills in the state, because the first two digits are the state code
+  const onGstinChange = (e) => {
+    const value = e.target.value.toUpperCase().replace(/\s/g, '');
+    const code = value.slice(0, 2);
+    const known = states.some((s) => s.code === code);
+    setForm({ ...form, gstin: value, stateCode: known ? code : form.stateCode });
+  };
+
+  const toggleModule = (key) =>
+    setModules((current) => (current.includes(key) ? current.filter((m) => m !== key) : [...current, key]));
 
   const onBannerChange = (e) => {
     const file = e.target.files[0];
@@ -69,6 +96,10 @@ export default function AdminTenantFormPage() {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    if (modules.length === 0) {
+      setError('Select at least one feature');
+      return;
+    }
     setSaving(true);
 
     const fd = new FormData();
@@ -76,6 +107,7 @@ export default function AdminTenantFormPage() {
       if (key === 'username' && isEdit) return;   // username cannot be changed
       fd.append(key, value ?? '');
     });
+    modules.forEach((m) => fd.append('modules', m));
     fd.append('removeBanner', removeBanner ? 'true' : 'false');
     if (bannerFile) fd.append('banner', bannerFile);
 
@@ -151,6 +183,58 @@ export default function AdminTenantFormPage() {
             />
           </div>
         </div>
+
+        <div className="card">
+          <strong>Features</strong>
+          <p className="subtitle">Choose what this tenant can use. You can change this later.</p>
+          {FEATURES.map((f) => (
+            <label key={f.key} style={{ display: 'block', marginBottom: 10 }}>
+              <input
+                type="checkbox"
+                checked={modules.includes(f.key)}
+                onChange={() => toggleModule(f.key)}
+              />{' '}
+              <strong>{f.label}</strong>
+              <span className="subtitle"> — {f.help}</span>
+            </label>
+          ))}
+        </div>
+
+        {modules.includes('GST') && (
+          <div className="card">
+            <strong>GST details</strong>
+            <p className="subtitle">Printed on tax invoices and used to work out CGST / SGST / IGST.</p>
+            <div style={{ ...grid, marginTop: 12 }}>
+              <div className="form-row">
+                <label>GSTIN * (15 characters)</label>
+                <input value={form.gstin} onChange={onGstinChange} maxLength={15} required />
+              </div>
+              <div className="form-row">
+                <label>State *</label>
+                <select value={form.stateCode} onChange={set('stateCode')} required>
+                  <option value="">Select a state</option>
+                  {states.map((s) => <option key={s.code} value={s.code}>{s.name} ({s.code})</option>)}
+                </select>
+              </div>
+              <div className="form-row">
+                <label>Invoice prefix * (2-4 letters, e.g. IJ gives IJ/26-27/0001)</label>
+                <input
+                  value={form.invoicePrefix}
+                  onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value.toUpperCase() })}
+                  maxLength={4}
+                  required
+                />
+              </div>
+              <div className="form-row">
+                <label>Return filing</label>
+                <select value={form.filingFrequency} onChange={set('filingFrequency')}>
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly (QRMP)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="card">
           <strong>Invoice banner (header)</strong>

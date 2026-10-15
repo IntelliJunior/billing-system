@@ -1,6 +1,7 @@
 package com.billing.security;
 
 import com.billing.model.AppUser;
+import com.billing.model.ModuleType;
 import com.billing.repository.AppUserRepository;
 import com.billing.repository.TenantRepository;
 import jakarta.servlet.FilterChain;
@@ -14,12 +15,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * For every authenticated /api request:
- *  - signs the user out if their tenant has been disabled, and
- *  - blocks everything except /me, /change-password and /logout while the
- *    user still has to change a default password.
+ *  - signs the user out if their tenant has been disabled,
+ *  - blocks everything except /me, /change-password and /logout while the user
+ *    still has to change a default password, and
+ *  - blocks features (modules) the admin has not enabled for the tenant.
  */
 public class PasswordChangeFilter extends OncePerRequestFilter {
 
@@ -60,8 +63,36 @@ public class PasswordChangeFilter extends OncePerRequestFilter {
                 write(res, 403, "PASSWORD_CHANGE_REQUIRED", "Please change your password to continue");
                 return;
             }
+
+            if (user.getTenantId() != null) {
+                List<ModuleType> required = requiredModules(path);
+                if (!required.isEmpty()) {
+                    List<ModuleType> enabled = tenants.findModulesById(user.getTenantId());
+                    if (required.stream().noneMatch(enabled::contains)) {
+                        write(res, 403, "MODULE_NOT_ENABLED", "This feature is not enabled for your account");
+                        return;
+                    }
+                }
+            }
         }
         chain.doFilter(req, res);
+    }
+
+    /** Any one of the listed modules is enough to use the URL. */
+    private List<ModuleType> requiredModules(String path) {
+        if (path.startsWith("/api/customers") || path.startsWith("/api/invoices")) {
+            return List.of(ModuleType.INVOICING);
+        }
+        if (path.startsWith("/api/products")) {
+            return List.of(ModuleType.INVOICING, ModuleType.INVENTORY);
+        }
+        if (path.startsWith("/api/inventory")) {
+            return List.of(ModuleType.INVENTORY);
+        }
+        if (path.startsWith("/api/gst")) {
+            return List.of(ModuleType.GST);
+        }
+        return List.of();
     }
 
     private void write(HttpServletResponse res, int status, String code, String message) throws IOException {

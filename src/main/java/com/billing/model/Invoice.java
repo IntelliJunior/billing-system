@@ -63,6 +63,24 @@ public class Invoice {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    // ---- GST snapshot, stored when the invoice is created (null on invoices made before GST) ----
+    private Boolean gstInvoice;
+    private String supplierGstin;
+    private String supplierStateCode;
+    private String customerGstin;
+    private String customerStateCode;
+    private String placeOfSupplyStateCode;
+    private Boolean interState;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal cgstAmount;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal sgstAmount;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal igstAmount;
+
     // Owner of this record. Never sent to or accepted from the browser.
     @Column(name = "tenant_id")
     @JsonIgnore

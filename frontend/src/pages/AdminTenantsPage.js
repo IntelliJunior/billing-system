@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getTenants, setTenantEnabled, resetTenantPassword } from '../api/api';
 
+const FEATURE_LABEL = { INVOICING: 'Invoicing', INVENTORY: 'Inventory', GST: 'GST' };
+
 export default function AdminTenantsPage() {
   const location = useLocation();
   const [tenants, setTenants] = useState([]);
@@ -87,7 +89,7 @@ export default function AdminTenantsPage() {
         ) : (
           <table>
             <thead>
-              <tr><th>Tenant</th><th>Contact</th><th>Mobile</th><th>Username</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Tenant</th><th>Contact</th><th>Mobile</th><th>Username</th><th>Features</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {tenants.map((t) => (
@@ -96,6 +98,7 @@ export default function AdminTenantsPage() {
                   <td>{t.contactName}</td>
                   <td>{t.mobile}</td>
                   <td>{t.username}</td>
+                  <td>{(t.modules || []).map((m) => FEATURE_LABEL[m] || m).join(' + ') || '—'}</td>
                   <td><span className={`badge ${t.enabled ? 'PAID' : 'CANCELLED'}`}>{t.enabled ? 'ACTIVE' : 'DISABLED'}</span></td>
                   <td>
                     <Link to={`/admin/tenants/${t.id}/edit`} className="btn secondary small">Edit</Link>{' '}
